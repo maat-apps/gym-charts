@@ -10,6 +10,7 @@ test.describe("app lock", () => {
     // navigation so the app's real create()/get() calls succeed against it.
     await page.context().credentials.install();
     await goHome(page);
+    await page.getByRole("button", { name: "Settings" }).click();
 
     const lockSwitch = page.getByRole("switch", { name: "App lock" });
     await expect(lockSwitch).toBeEnabled();
@@ -19,7 +20,9 @@ test.describe("app lock", () => {
     // Enrolling counts as unlocked, but that's per-session memory — a
     // reload locks again, and the lock screen prompts by itself.
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Welcome" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Connect your data" }),
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: "Unlock" })).toBeHidden();
   });
 });

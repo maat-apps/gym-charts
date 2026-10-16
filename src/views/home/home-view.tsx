@@ -1,100 +1,136 @@
-import { useEffect, useState } from "react";
+import { ArrowsClockwise, Gear } from "@phosphor-icons/react";
+import { startTransition, useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 
+import { Button } from "@maat-apps/ui/button";
+import { EmptyState } from "@maat-apps/ui/empty-state";
+import { PageHeader, PageTitle } from "@maat-apps/ui/page-header";
 import { useAppSettings } from "../../hooks/use-app-settings";
-import { useInstallPrompt } from "../../hooks/use-install-prompt";
+import { useGymData, useGymReady } from "../../hooks/use-gym-data";
 import { useTranslation } from "../../i18n/use-translation";
-import { appLock } from "../../lib/app-lock";
-import { updateApp } from "../../lib/app-update";
+import { setSelectedPlan } from "../../lib/app-settings";
+import { sync, syncOnStart } from "../../lib/storage";
+import { SettingsDrawer } from "../settings/settings-drawer";
+import { SyncError } from "../settings/sync-error";
 
-// A starting point, not a destination — this app's real Settings screen
-// (once it has one) is where install/update actions like these normally
-// live; see trainer's or routines' own settings-app-section.tsx and
-// settings-security-section.tsx for that pattern once this app is past its
-// first view.
+import { ExerciseRow } from "./exercise-row";
+
+/** "/": one plan's exercises at a time, the plan picked in the bottom bar. */
 export function HomeView() {
   const { t } = useTranslation();
-  const install = useInstallPrompt();
-  const [updating, setUpdating] = useState(false);
-  const { lock } = useAppSettings();
-  const [lockSupported, setLockSupported] = useState(false);
-  const [lockError, setLockError] = useState(false);
+  const navigate = useNavigate();
+  const ready = useGymReady();
+  const { source, data, syncing, error } = useGymData();
+  const { selectedPlan } = useAppSettings();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    let active = true;
-    void appLock.isSupported().then((supported) => {
-      if (active) setLockSupported(supported);
-    });
-    return () => {
-      active = false;
-    };
+    void syncOnStart();
   }, []);
 
-  async function toggleAppLock() {
-    setLockError(false);
-    if (lock) {
-      appLock.disable();
-      return;
-    }
-    try {
-      await appLock.enrol();
-    } catch {
-      // Cancelling the platform prompt lands here too; leave the lock off.
-      setLockError(true);
-    }
+  const plans = data?.plans ?? [];
+  const plan = plans.find((item) => item.id === selectedPlan) ?? plans[0];
+  const exercises = (plan?.exercises ?? []).flatMap((id) => {
+    const exercise = data?.exercises.find((item) => item.id === id);
+    return exercise ? [exercise] : [];
+  });
+
+  function open(id: string) {
+    startTransition(() => navigate(`/exercise/${encodeURIComponent(id)}`));
   }
 
+  const settingsButton = (
+    <Button
+      variant="ghost"
+      size="icon-lg"
+      className="size-14 shrink-0"
+      aria-label={t("settings")}
+      onClick={() => setSettingsOpen(true)}
+    >
+      <Gear className="size-6" />
+    </Button>
+  );
+
   return (
-    <main className="grid min-h-dvh place-items-center gap-6 p-8 text-center">
-      <h1 className="text-xl">{t("welcome")}</h1>
-      <div className="flex flex-col gap-3 text-sm">
-        <div className="flex flex-col gap-1">
-          <span>
-            {install.state === "installed"
-              ? t("installAppInstalled")
-              : install.state === "available"
-                ? t("installAppDescription")
-                : t("installAppUnavailable")}
-          </span>
-          <button
-            type="button"
-            className="border-input rounded-lg border px-4 py-2 disabled:opacity-50"
-            disabled={install.state !== "available"}
-            onClick={() => void install.install()}
+    <div className="mx-auto flex min-h-dvh w-[min(100%,480px)] flex-col gap-5 px-5 pt-27 pb-[calc(112px+env(safe-area-inset-bottom))]">
+      <PageHeader>
+        <PageTitle>{t("appName")}</PageTitle>
+        {source && (
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            aria-label={t("refresh")}
+            disabled={syncing}
+            onClick={() => void sync()}
           >
-            {t("installAppAction")}
-          </button>
-        </div>
-        <div className="flex flex-col gap-1">
-          <span>
-            {lockSupported ? t("appLockDescription") : t("appLockUnsupported")}
-          </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={lock !== null}
-            className="border-input rounded-lg border px-4 py-2 disabled:opacity-50"
-            disabled={!lockSupported}
-            onClick={() => void toggleAppLock()}
+            <ArrowsClockwise
+              className={syncing ? "size-6 animate-spin" : "size-6"}
+            />
+          </Button>
+        )}
+      </PageHeader>
+      {error && data && <SyncError error={error} />}
+      {!ready ? null : !source ? (
+        <EmptyState
+          title={t("connectTitle")}
+          description={t("connectDescription")}
+          action={{
+            label: t("connectAction"),
+            onClick: () => setSettingsOpen(true),
+          }}
+        />
+      ) : !data ? (
+        <EmptyState
+          title={syncing ? t("downloading") : t("noDataTitle")}
+          description={error ? undefined : t("noDataDescription")}
+          action={
+            syncing
+              ? undefined
+              : {
+                  label: t("refresh"),
+                  onClick: () => void sync(),
+                  variant: "outline",
+                }
+          }
+        />
+      ) : exercises.length === 0 ? (
+        <EmptyState title={t("emptyPlan")} />
+      ) : (
+        <ul aria-label={plan?.name} className="m-0 grid list-none gap-2 p-0">
+          {exercises.map((exercise) => (
+            <li key={exercise.id}>
+              <ExerciseRow
+                exercise={exercise}
+                onOpen={() => open(exercise.id)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+      {!data && error && <SyncError error={error} />}
+      <div className="bg-background/95 fixed inset-x-0 bottom-0 z-20 border-t backdrop-blur">
+        <div className="mx-auto flex w-[min(100%,480px)] items-center gap-1 px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+          <div
+            role="group"
+            aria-label={t("plans")}
+            className="-ml-4 flex min-w-0 flex-1 [scrollbar-width:none] gap-2 overflow-x-auto [mask-image:linear-gradient(to_right,black_calc(100%-24px),transparent)] pr-6 pl-4"
           >
-            {t("appLock")}
-          </button>
-          {lockError && <span role="alert">{t("appLockFailed")}</span>}
-        </div>
-        <div className="flex flex-col gap-1">
-          <span>{t("updateAppDescription")}</span>
-          <button
-            type="button"
-            className="border-input rounded-lg border px-4 py-2 disabled:opacity-50"
-            disabled={updating}
-            onClick={() => {
-              setUpdating(true);
-              void updateApp();
-            }}
-          >
-            {updating ? t("updateAppBusy") : t("updateAppAction")}
-          </button>
+            {plans.map((item) => (
+              <Button
+                key={item.id}
+                variant={item.id === plan?.id ? "default" : "outline"}
+                className="h-14 shrink-0 rounded-2xl px-4 text-base"
+                aria-pressed={item.id === plan?.id}
+                onClick={() => setSelectedPlan(item.id)}
+              >
+                {item.name}
+              </Button>
+            ))}
+          </div>
+          {settingsButton}
         </div>
       </div>
-    </main>
+      <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} />
+    </div>
   );
 }

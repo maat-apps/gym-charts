@@ -2,3 +2,4 @@
 // storage, backup and reset logic stay in step.
 export const SETTINGS_KEY = "gym-charts-settings";
 export const LOCALE_KEY = "gym-charts-locale";
+export const DATA_KEY = "gym-charts-data";

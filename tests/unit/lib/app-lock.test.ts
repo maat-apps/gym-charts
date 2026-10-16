@@ -68,3 +68,27 @@ describe("appLock", () => {
     expect(appLock.isSessionUnlocked()).toBe(true);
   });
 });
+
+describe("appLock data", () => {
+  it("erases the source and data on disableAndErase", async () => {
+    const { settings, appLock } = await freshModules();
+    const storage = await import("@/lib/storage");
+    await storage.whenLoaded();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ version: 1 }))),
+    );
+    await storage.connect({ repo: "a/b", path: "f.json", token: "t" });
+    settings.setLockEnrolment({
+      credentialId: "c1",
+      userId: "u1",
+      createdAt: "now",
+      encryptionSupported: true,
+      prfSalt: "c2FsdA",
+    });
+
+    await appLock.disableAndErase();
+
+    expect(storage.getGymSnapshot().source).toBeNull();
+  });
+});

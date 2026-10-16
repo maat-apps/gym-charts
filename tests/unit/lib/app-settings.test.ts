@@ -117,3 +117,31 @@ describe("setLockEnrolment", () => {
     expect(appSettings.isSettingsReadyOnServer()).toBe(false);
   });
 });
+
+describe("setSelectedPlan", () => {
+  it("remembers the plan tab", async () => {
+    const appSettings = await freshAppSettings();
+    expect(appSettings.getSettingsSnapshot().selectedPlan).toBeNull();
+
+    appSettings.setSelectedPlan("b");
+
+    expect(appSettings.getSettingsSnapshot().selectedPlan).toBe("b");
+  });
+
+  it("loads a stored plan and ignores a non-string one", async () => {
+    vi.resetModules();
+    const { kvSet } = await import("@/lib/idb-store");
+    const { SETTINGS_KEY } = await import("@/lib/storage-keys");
+    await kvSet(SETTINGS_KEY, { selectedPlan: "b" });
+    const appSettings = await freshAppSettings();
+    await appSettings.whenLoaded();
+    expect(appSettings.getSettingsSnapshot().selectedPlan).toBe("b");
+
+    vi.resetModules();
+    const store = await import("@/lib/idb-store");
+    await store.kvSet(SETTINGS_KEY, { selectedPlan: 3 });
+    const reloaded = await freshAppSettings();
+    await reloaded.whenLoaded();
+    expect(reloaded.getSettingsSnapshot().selectedPlan).toBeNull();
+  });
+});
