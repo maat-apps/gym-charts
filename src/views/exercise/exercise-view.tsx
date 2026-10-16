@@ -50,6 +50,7 @@ export function ExerciseView() {
     topWeight: exercise.assisted
       ? t("measureAssistance")
       : t("measureTopWeight"),
+    repsAtTop: t("measureRepsAtTop"),
     estimatedMax: t("measureEstimatedMax"),
     volume: t("measureVolume"),
     bestReps: t("measureBestReps"),
@@ -127,7 +128,11 @@ export function ExerciseView() {
             inverted={inverted}
           />
           <p className="text-muted-foreground m-0 -mt-2 text-xs">
-            {inverted ? t("recordHintInverted") : t("recordHint")}
+            {exercise.assisted
+              ? t("recordHintAssisted")
+              : exercise.metric === "weight"
+                ? t("recordHintWeight")
+                : t("recordHint")}
           </p>
           <SessionList exercise={exercise} progress={progress} />
         </>

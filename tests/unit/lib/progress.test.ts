@@ -10,6 +10,7 @@ import {
   personalBest,
   scoreSets,
   seriesKeys,
+  topSets,
 } from "@/lib/progress";
 import type { Exercise } from "@/lib/schemas";
 
@@ -17,11 +18,20 @@ import { assisted, crunch, hold, squat } from "../fixtures/gym-data";
 
 describe("measuresFor", () => {
   it("offers weight measures for a lift", () => {
-    expect(measuresFor(squat)).toEqual(["topWeight", "estimatedMax", "volume"]);
+    expect(measuresFor(squat)).toEqual([
+      "topWeight",
+      "repsAtTop",
+      "estimatedMax",
+      "volume",
+    ]);
   });
 
   it("offers assistance and reps for an assisted lift", () => {
-    expect(measuresFor(assisted)).toEqual(["topWeight", "totalReps"]);
+    expect(measuresFor(assisted)).toEqual([
+      "topWeight",
+      "repsAtTop",
+      "totalReps",
+    ]);
   });
 
   it("offers reps measures and time measures", () => {
@@ -57,6 +67,8 @@ describe("scoreSets", () => {
   it("scores each measure", () => {
     expect(scoreSets(sets, "topWeight")).toBe(50);
     expect(scoreSets(sets, "topWeight", true)).toBe(40);
+    expect(scoreSets(sets, "repsAtTop")).toBe(5);
+    expect(scoreSets(sets, "repsAtTop", true)).toBe(10);
     expect(scoreSets(sets, "estimatedMax")).toBe(58.3);
     expect(scoreSets(sets, "volume")).toBe(650);
     expect(scoreSets(sets, "bestReps")).toBe(10);
@@ -72,6 +84,7 @@ describe("scoreSets", () => {
   it("is undefined without a matching set", () => {
     for (const measure of [
       "topWeight",
+      "repsAtTop",
       "estimatedMax",
       "volume",
       "bestReps",
@@ -81,6 +94,22 @@ describe("scoreSets", () => {
     }
     expect(scoreSets([{ reps: 3 }], "longest")).toBeUndefined();
     expect(scoreSets([{ reps: 3 }], "totalTime")).toBeUndefined();
+  });
+});
+
+describe("topSets", () => {
+  it("is the top weight and every set's reps at it", () => {
+    const sets = [
+      { weight: 60, reps: 9 },
+      { weight: 90, reps: 4 },
+      { weight: 90, reps: 2 },
+    ];
+    expect(topSets(sets)).toEqual({ weight: 90, reps: [4, 2] });
+    expect(topSets(sets, true)).toEqual({ weight: 60, reps: [9] });
+  });
+
+  it("is undefined without reps", () => {
+    expect(topSets([{ seconds: 10 }])).toBeUndefined();
   });
 });
 
@@ -101,6 +130,59 @@ describe("buildProgress", () => {
       true,
       false,
       true,
+    ]);
+  });
+
+  it("counts more reps at the same top weight as a record", () => {
+    const sameWeight: Exercise = {
+      ...squat,
+      sessions: [
+        {
+          sets: [
+            { weight: 70, reps: 4 },
+            { weight: 70, reps: 4 },
+          ],
+        },
+        {
+          sets: [
+            { weight: 50, reps: 12 },
+            { weight: 70, reps: 9 },
+          ],
+        },
+        { sets: [{ weight: 70, reps: 3 }] },
+      ],
+    };
+    const { points } = buildProgress(sameWeight, "topWeight");
+    expect(points.map((point) => point.records.value ?? false)).toEqual([
+      false,
+      true,
+      false,
+    ]);
+  });
+
+  it("marks the same records on every measure of a weight exercise", () => {
+    const records = (measure: "volume" | "repsAtTop") =>
+      buildProgress(squat, measure).points.map(
+        (point) => point.records.value ?? false,
+      );
+    expect(records("volume")).toEqual([false, true, false, true]);
+    expect(records("repsAtTop")).toEqual([false, true, false, true]);
+  });
+
+  it("counts the same assistance with more reps as a record", () => {
+    const moreReps: Exercise = {
+      ...assisted,
+      sessions: [
+        { sets: [{ weight: 30, reps: 6 }] },
+        { sets: [{ weight: 30, reps: 7 }] },
+        { sets: [{ weight: 35, reps: 20 }] },
+      ],
+    };
+    const { points } = buildProgress(moreReps, "topWeight");
+    expect(points.map((point) => point.records.value ?? false)).toEqual([
+      false,
+      true,
+      false,
     ]);
   });
 
@@ -138,6 +220,23 @@ describe("buildProgress", () => {
     expect(points[2]?.records).toEqual({ value: true });
   });
 
+  it("skips an unscored session when looking for reps records", () => {
+    const gap: Exercise = {
+      ...crunch,
+      sessions: [
+        { sets: [{ reps: 10 }] },
+        { sets: [{ seconds: 30 }] },
+        { sets: [{ reps: 12 }] },
+      ],
+    };
+    const { points } = buildProgress(gap, "bestReps");
+    expect(points.map((point) => point.records.value ?? false)).toEqual([
+      false,
+      false,
+      true,
+    ]);
+  });
+
   it("carries the session date", () => {
     const dated: Exercise = {
       ...crunch,
@@ -155,20 +254,42 @@ describe("countRecords", () => {
 });
 
 describe("personalBest", () => {
-  it("is the heaviest weight with the most reps at it", () => {
+  it("is the best session's top weight and its reps at it", () => {
     const best = personalBest({
       ...squat,
       sessions: [...squat.sessions, { sets: [{ weight: 55, reps: 5 }] }],
     });
-    expect(best).toEqual({ kind: "weight", weight: 55, reps: 5 });
+    expect(best).toEqual({ kind: "weight", weight: 55, reps: [5] });
   });
 
   it("is the lightest assistance for an assisted lift", () => {
     expect(personalBest(assisted)).toEqual({
       kind: "weight",
       weight: 25,
-      reps: 5,
+      reps: [5],
     });
+  });
+
+  it("prefers more total reps at the same top weight", () => {
+    const best = personalBest({
+      ...squat,
+      sessions: [
+        {
+          sets: [
+            { weight: 70, reps: 4 },
+            { weight: 70, reps: 4 },
+          ],
+        },
+        {
+          sets: [
+            { weight: 70, reps: 3 },
+            { weight: 70, reps: 6 },
+          ],
+        },
+        { sets: [{ weight: 70, reps: 5 }] },
+      ],
+    });
+    expect(best).toEqual({ kind: "weight", weight: 70, reps: [3, 6] });
   });
 
   it("is the most reps or the longest hold", () => {
