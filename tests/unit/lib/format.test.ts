@@ -22,6 +22,7 @@ describe("unitOf", () => {
     expect(unitOf("topWeight")).toBe("kg");
     expect(unitOf("estimatedMax")).toBe("kg");
     expect(unitOf("volume")).toBe("kg");
+    expect(unitOf("repsAtTop")).toBe("reps");
     expect(unitOf("bestReps")).toBe("reps");
     expect(unitOf("totalReps")).toBe("reps");
     expect(unitOf("longest")).toBe("s");
@@ -32,8 +33,8 @@ describe("unitOf", () => {
 describe("formatPersonalBest", () => {
   it("formats each kind", () => {
     expect(
-      formatPersonalBest({ kind: "weight", weight: 57.5, reps: 3 }, "pl"),
-    ).toBe("57,5 kg × 3");
+      formatPersonalBest({ kind: "weight", weight: 57.5, reps: [3, 2] }, "pl"),
+    ).toBe("57,5 kg × 3, 2");
     expect(formatPersonalBest({ kind: "reps", reps: 20 }, "en")).toBe("20");
     expect(formatPersonalBest({ kind: "time", seconds: 61 }, "en")).toBe(
       "61 s",

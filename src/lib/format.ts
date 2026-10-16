@@ -17,6 +17,7 @@ export function unitOf(measure: Measure): Unit {
     case "estimatedMax":
     case "volume":
       return "kg";
+    case "repsAtTop":
     case "bestReps":
     case "totalReps":
       return "reps";
@@ -26,11 +27,11 @@ export function unitOf(measure: Measure): Unit {
   }
 }
 
-/** "100 kg × 3", "20" (reps) or "61 s" — without the reps unit. */
+/** "100 kg × 3, 3, 2", "20" (reps) or "61 s" — without the reps unit. */
 export function formatPersonalBest(best: PersonalBest, locale: string): string {
   switch (best.kind) {
     case "weight":
-      return `${formatNumber(best.weight, locale)} kg × ${formatNumber(best.reps, locale)}`;
+      return `${formatNumber(best.weight, locale)} kg × ${formatList(best.reps, locale)}`;
     case "reps":
       return formatNumber(best.reps, locale);
     case "time":

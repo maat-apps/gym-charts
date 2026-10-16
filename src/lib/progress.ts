@@ -6,6 +6,7 @@ import type { Exercise, Session, Side, WorkoutSet } from "./schemas";
 
 export type Measure =
   | "topWeight"
+  | "repsAtTop"
   | "estimatedMax"
   | "volume"
   | "bestReps"
@@ -30,7 +31,7 @@ export type Progress = {
 };
 
 export type PersonalBest =
-  | { kind: "weight"; weight: number; reps: number }
+  | { kind: "weight"; weight: number; reps: number[] }
   | { kind: "reps"; reps: number }
   | { kind: "time"; seconds: number };
 
@@ -38,12 +39,12 @@ export type PersonalBest =
 export function measuresFor(exercise: Exercise): Measure[] {
   if (exercise.metric === "time") return ["longest", "totalTime"];
   if (exercise.metric === "reps") return ["bestReps", "totalReps"];
-  if (exercise.assisted) return ["topWeight", "totalReps"];
-  return ["topWeight", "estimatedMax", "volume"];
+  if (exercise.assisted) return ["topWeight", "repsAtTop", "totalReps"];
+  return ["topWeight", "repsAtTop", "estimatedMax", "volume"];
 }
 
 /** Whether a smaller value is the better one (an assisted exercise's
- * counterweight). */
+ * counterweight), which flips the chart's axis. */
 export function lowerIsBetter(exercise: Exercise, measure: Measure): boolean {
   return exercise.assisted === true && measure === "topWeight";
 }
@@ -72,25 +73,57 @@ function timedSets(sets: WorkoutSet[]): number[] {
 
 const sum = (values: number[]) => values.reduce((total, n) => total + n, 0);
 
-/** A session's score on `measure`, or `undefined` when it has no such set. */
+/** The heaviest weight in `sets` (lightest when `assisted`) and every
+ * set's reps at it, or `undefined` without a set with reps. */
+export function topSets(
+  sets: WorkoutSet[],
+  assisted = false,
+): { weight: number; reps: number[] } | undefined {
+  const lifted = liftedSets(sets);
+  if (lifted.length === 0) return undefined;
+  const weights = lifted.map(weightOf);
+  const weight = assisted ? Math.min(...weights) : Math.max(...weights);
+  return {
+    weight,
+    reps: lifted.filter((set) => weightOf(set) === weight).map((s) => s.reps),
+  };
+}
+
+/**
+ * Whether session `a` beats session `b` on weight: a better top weight, or
+ * the same one with more reps done at it in total.
+ */
+function beatsOnWeight(
+  a: { weight: number; reps: number[] },
+  b: { weight: number; reps: number[] },
+  assisted: boolean,
+): boolean {
+  if (a.weight !== b.weight) {
+    return assisted ? a.weight < b.weight : a.weight > b.weight;
+  }
+  return sum(a.reps) > sum(b.reps);
+}
+
+/** A session's score on `measure`, or `undefined` when it has no such set.
+ * `assisted` makes the lightest weight the top one. */
 export function scoreSets(
   sets: WorkoutSet[],
   measure: Measure,
-  lowerBetter = false,
+  assisted = false,
 ): number | undefined {
   const lifted = liftedSets(sets);
   const timed = timedSets(sets);
-  const pick = (values: number[]) =>
-    values.length === 0
-      ? undefined
-      : lowerBetter
-        ? Math.min(...values)
-        : Math.max(...values);
+  const max = (values: number[]) =>
+    values.length === 0 ? undefined : Math.max(...values);
   switch (measure) {
     case "topWeight":
-      return pick(lifted.map(weightOf));
+      return topSets(sets, assisted)?.weight;
+    case "repsAtTop": {
+      const top = topSets(sets, assisted);
+      return top && sum(top.reps);
+    }
     case "estimatedMax":
-      return pick(
+      return max(
         lifted.map((set) => estimateOneRepMax(weightOf(set), set.reps)),
       );
     case "volume":
@@ -99,11 +132,11 @@ export function scoreSets(
         : Math.round(sum(lifted.map((set) => weightOf(set) * set.reps)) * 10) /
             10;
     case "bestReps":
-      return pick(lifted.map((set) => set.reps));
+      return max(lifted.map((set) => set.reps));
     case "totalReps":
       return lifted.length === 0 ? undefined : sum(lifted.map((s) => s.reps));
     case "longest":
-      return pick(timed);
+      return max(timed);
     case "totalTime":
       return timed.length === 0 ? undefined : sum(timed);
   }
@@ -127,15 +160,42 @@ function setsFor(session: Session, key: SeriesKey): WorkoutSet[] {
     : session.sets.filter((set) => set.side === key);
 }
 
-/**
- * Every session's score per series, oldest first. A record is a score
- * strictly better than every earlier one in its series — the first session
- * only sets the baseline.
- */
+/** Whether each session (per series) set a record: for a weight exercise
+ * by `beatsOnWeight`, otherwise by a strictly better score on `measure`.
+ * The first scored session only sets the baseline. */
+function findRecords(
+  exercise: Exercise,
+  key: SeriesKey,
+  measure: Measure,
+): boolean[] {
+  const assisted = exercise.assisted === true;
+  if (exercise.metric === "weight") {
+    let best: { weight: number; reps: number[] } | undefined;
+    return exercise.sessions.map((session) => {
+      const top = topSets(setsFor(session, key), assisted);
+      if (!top) return false;
+      const record = best !== undefined && beatsOnWeight(top, best, assisted);
+      if (best === undefined || record) best = top;
+      return record;
+    });
+  }
+  let best: number | undefined;
+  return exercise.sessions.map((session) => {
+    const value = scoreSets(setsFor(session, key), measure);
+    if (value === undefined) return false;
+    const record = best !== undefined && value > best;
+    if (best === undefined || record) best = value;
+    return record;
+  });
+}
+
+/** Every session's score per series, oldest first, with its records. */
 export function buildProgress(exercise: Exercise, measure: Measure): Progress {
   const keys = seriesKeys(exercise);
-  const lowerBetter = lowerIsBetter(exercise, measure);
-  const best: Partial<Record<SeriesKey, number>> = {};
+  const assisted = exercise.assisted === true;
+  const records = new Map(
+    keys.map((key) => [key, findRecords(exercise, key, measure)]),
+  );
   const points = exercise.sessions.map((session, index) => {
     const point: ProgressPoint = {
       session: index + 1,
@@ -144,15 +204,10 @@ export function buildProgress(exercise: Exercise, measure: Measure): Progress {
       records: {},
     };
     for (const key of keys) {
-      const value = scoreSets(setsFor(session, key), measure, lowerBetter);
+      const value = scoreSets(setsFor(session, key), measure, assisted);
       if (value === undefined) continue;
       point.values[key] = value;
-      const previous = best[key];
-      const improved =
-        previous === undefined ||
-        (lowerBetter ? value < previous : value > previous);
-      if (previous !== undefined && improved) point.records[key] = true;
-      if (improved) best[key] = value;
+      if (records.get(key)?.[index]) point.records[key] = true;
     }
     return point;
   });
@@ -167,8 +222,9 @@ export function countRecords(progress: Progress): number {
 }
 
 /**
- * The exercise's best ever set: the heaviest weight (lightest assistance)
- * with the most reps done at it, the most reps, or the longest hold.
+ * The exercise's best: for weights, the best session by `beatsOnWeight` —
+ * its top weight and the reps done at it; otherwise the most reps in a set
+ * or the longest hold.
  */
 export function personalBest(exercise: Exercise): PersonalBest | undefined {
   const sets = exercise.sessions.flatMap((session) => session.sets);
@@ -182,14 +238,13 @@ export function personalBest(exercise: Exercise): PersonalBest | undefined {
     const reps = scoreSets(sets, "bestReps");
     return reps === undefined ? undefined : { kind: "reps", reps };
   }
-  const weight = scoreSets(sets, "topWeight", exercise.assisted === true);
-  if (weight === undefined) return undefined;
-  const reps = Math.max(
-    ...liftedSets(sets)
-      .filter((set) => weightOf(set) === weight)
-      .map((set) => set.reps),
-  );
-  return { kind: "weight", weight, reps };
+  const assisted = exercise.assisted === true;
+  let best: { weight: number; reps: number[] } | undefined;
+  for (const session of exercise.sessions) {
+    const top = topSets(session.sets, assisted);
+    if (top && (!best || beatsOnWeight(top, best, assisted))) best = top;
+  }
+  return best && { kind: "weight", ...best };
 }
 
 /** Consecutive sets at the same weight and side, for display: 50 × 6, 5, 5. */

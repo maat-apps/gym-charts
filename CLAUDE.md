@@ -58,11 +58,16 @@ scope are in [`PRODUCT.md`](./PRODUCT.md).
   numbers** — tests and e2e use made-up data (`tests/unit/fixtures/`,
   `e2e/utils.ts`'s `GYM_DATA`, GitHub mocked with `page.route`).
 - **Progress maths** are pure helpers in `lib/progress.ts`: per-exercise
-  measures (`measuresFor` — weight: top weight / Epley 1RM / volume;
-  `assisted`: assistance, where lower is better and the chart's axis is
-  reversed; reps; time), one series per side when sets carry `side`, a
-  record = strictly better than every earlier session (the first only sets
-  the baseline), `personalBest`, `groupSets`. Number/date formatting:
+  measures (`measuresFor` — weight: top weight / reps at the top weight /
+  Epley 1RM / volume; `assisted`: assistance, where lower is better and
+  the chart's axis is reversed; reps; time), one series per side when sets
+  carry `side`. A **record is per session**: for weight exercises a better
+  top weight than every earlier session, or the same one with more reps
+  done at it in total (`topSets`, `beatsOnWeight` — the owner's rule; the
+  same sessions are ringed on every measure); for reps/time a strictly
+  better score. The first session only sets the baseline. `personalBest`
+  is the best session by the same rule ("100 kg × 3, 3, 3, 2"),
+  `groupSets` groups sets for display. Number/date formatting:
   `lib/format.ts`.
 - **Screens.** `/` (`views/home`: one plan at a time, plan chips + settings
   in the bottom bar, the chosen plan remembered in `app-settings.ts`'s
