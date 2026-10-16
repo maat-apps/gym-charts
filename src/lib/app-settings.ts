@@ -11,17 +11,21 @@ export type AppSettings = {
   /** The app lock's enrolment (@maat-apps/core/lock), `null` when off. */
   lock: LockEnrolment | null;
   installed: boolean;
+  /** The plan tab home last showed (a plan id from the data file). */
+  selectedPlan: string | null;
 };
 
 const settingsStore = createPersistedStore<AppSettings>({
   storage: keyValueStore,
   key: SETTINGS_KEY,
-  defaults: { lock: null, installed: false },
+  defaults: { lock: null, installed: false, selectedPlan: null },
   parse: (stored) => {
     const value = stored as Record<string, unknown>;
     return {
       lock: parseLockEnrolment(value.lock),
       installed: value.installed === true,
+      selectedPlan:
+        typeof value.selectedPlan === "string" ? value.selectedPlan : null,
     };
   },
 });
@@ -49,4 +53,8 @@ export function setLockEnrolment(lock: LockEnrolment | null): void {
 export function markInstalled(): void {
   if (getSettingsSnapshot().installed) return;
   settingsStore.set({ installed: true });
+}
+
+export function setSelectedPlan(selectedPlan: string): void {
+  settingsStore.set({ selectedPlan });
 }

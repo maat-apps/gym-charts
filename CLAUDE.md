@@ -8,7 +8,8 @@ pattern, i18n approach, naming conventions, testing split) see
 For the "verify each change exactly once" principle behind this repo's
 automation setup, see
 [`maat-core/VERIFICATION.md`](https://github.com/maat-apps/maat-core/blob/main/VERIFICATION.md).
-What follows here is what's specific to **gym-charts**.
+What follows here is what's specific to **gym-charts** — product intent and
+scope are in [`PRODUCT.md`](./PRODUCT.md).
 
 <!-- BEGIN AUTO-GENERATED: setup-claude-workflow -->
 <!-- Only Project Snapshot and Commands below are ever rewritten by --refresh. -->
@@ -43,13 +44,44 @@ What follows here is what's specific to **gym-charts**.
 - A Playwright project's reusable test-helper file belongs at
   `e2e/utils.ts`, not `fixtures.ts` — these are plain functions specs call
   directly, not Playwright's own `test.extend()` fixture-injection system.
+- **Data.** The app doesn't edit training data: it reads one JSON file
+  (`schemas.ts`, `version: 1`, documented in the private data repo's
+  README) from the user's own private GitHub repo — `lib/github.ts`, the
+  contents API with a fine-grained read-only token pasted in Settings →
+  Data. `src/lib/storage.ts` keeps the source (repo, path, token), the
+  last downloaded copy and its time in memory + IndexedDB (maat-core's
+  `docs/storage.md`), encrypted with the lock's key; read through
+  `src/hooks/use-gym-data.ts`. It downloads once per app run
+  (`syncOnStart`, from home) and on Refresh; a failed download keeps the
+  old copy and shows why (`views/settings/sync-error.tsx`). No backups or
+  update snapshot — the repo is the backup. **Never commit the owner's
+  numbers** — tests and e2e use made-up data (`tests/unit/fixtures/`,
+  `e2e/utils.ts`'s `GYM_DATA`, GitHub mocked with `page.route`).
+- **Progress maths** are pure helpers in `lib/progress.ts`: per-exercise
+  measures (`measuresFor` — weight: top weight / Epley 1RM / volume;
+  `assisted`: assistance, where lower is better and the chart's axis is
+  reversed; reps; time), one series per side when sets carry `side`, a
+  record = strictly better than every earlier session (the first only sets
+  the baseline), `personalBest`, `groupSets`. Number/date formatting:
+  `lib/format.ts`.
+- **Screens.** `/` (`views/home`: one plan at a time, plan chips + settings
+  in the bottom bar, the chosen plan remembered in `app-settings.ts`'s
+  `selectedPlan`; rows show the personal best and a sparkline),
+  `/exercise/:id` (`views/exercise`: personal best, record count, measure
+  chips, the recharts line chart from `@maat-apps/ui/chart` with records
+  as ringed dots, sessions newest first). Settings is a drawer
+  (`views/settings/`, one `settings-<name>-section.tsx` per card).
+- **i18n.** `src/i18n/en.json` and `pl.json` (core's `createTranslation`;
+  device language on first launch, Settings → Language after). `t()`
+  only accepts keys present in both — keep them in sync. Exercise and
+  plan names come from the data file as written.
 - **App lock.** Every maat-apps app has it (`@maat-apps/core/lock` +
   `@maat-apps/ui/app-lock-gate`, wrapped around the router in
-  `src/app/router.tsx`). `src/lib/app-lock.ts` wires it to settings; once
-  the app keeps data, connect its `data.rewrite`/`data.erase` to storage
-  and encrypt what storage persists with `src/lib/encryption-key.ts` (see
-  maat-core's `docs/storage.md`). **Never change `HKDF_INFO`** once users
-  have data.
+  `src/app/router.tsx`). `src/lib/app-lock.ts` rewrites the stored
+  source + data with the current key and erases them (`disconnect`);
+  `storage.ts` encrypts with `src/lib/encryption-key.ts`. **Never change
+  `HKDF_INFO` (`"gym-charts-data-v1"`)** — existing encrypted data would
+  become unreadable.
 - Full pattern log: none yet — run `/learn-patterns` after a non-trivial
   session to start one.
 
