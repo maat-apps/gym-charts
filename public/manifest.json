@@ -1,0 +1,18 @@
+{
+  "name": "gym-charts",
+  "short_name": "gym-charts",
+  "description": "gym-charts",
+  "start_url": "/gym-charts/",
+  "scope": "/gym-charts/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/gym-charts/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
