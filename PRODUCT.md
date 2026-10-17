@@ -16,8 +16,8 @@ web - PWA, mobile-only (like routines, notes and albums).
 
 ## Scope
 
-- Plans as tabs (e.g. Plan A, Plan B, an "other" bucket for old
-  exercises); an exercise can be marked inactive.
+- Plans as tabs (e.g. Plan A, Plan B), plus "Other" for the exercises
+  no plan lists (e.g. old ones); an exercise can be marked inactive.
 - Per exercise: personal best, number of records, a line chart per
   measure (weight, estimated 1RM, volume; assistance for assisted
   exercises, with the axis flipped; reps; hold time, per side when

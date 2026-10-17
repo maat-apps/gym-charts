@@ -55,6 +55,12 @@ export const GYM_DATA = {
         },
       ],
     },
+    {
+      id: "row",
+      name: "Row",
+      metric: "reps",
+      sessions: [{ sets: [{ reps: 12 }] }],
+    },
   ],
 };
 

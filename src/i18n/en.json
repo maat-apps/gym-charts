@@ -7,6 +7,7 @@
   "refresh": "Refresh",
   "downloading": "Downloading…",
   "plans": "Plans",
+  "otherPlan": "Other",
   "connectTitle": "Connect your data",
   "connectDescription": "Your training data lives in your own private GitHub repo. Connect it in Settings.",
   "connectAction": "Connect",

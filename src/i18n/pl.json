@@ -7,6 +7,7 @@
   "refresh": "Odśwież",
   "downloading": "Pobieranie…",
   "plans": "Plany",
+  "otherPlan": "Inne",
   "connectTitle": "Połącz swoje dane",
   "connectDescription": "Twoje dane treningowe są w Twoim prywatnym repozytorium na GitHubie. Połącz je w Ustawieniach.",
   "connectAction": "Połącz",

@@ -80,7 +80,8 @@ scope are in [`PRODUCT.md`](./PRODUCT.md).
 - **Screens.** `/` (`views/home`: one plan at a time; by the owner's choice
   not maat-core's `BottomBar` — a fixed header with the title, Refresh and
   the settings gear, and the plans as bottom tabs (`plan-tabs.tsx`,
-  `role="tab"`), the chosen plan remembered in `app-settings.ts`'s
+  `role="tab"`; `lib/plans.ts`'s `planTabs` adds "Other" for exercises no
+  plan lists), the chosen plan remembered in `app-settings.ts`'s
   `selectedPlan`; rows show the personal best and a sparkline),
   `/exercise/:id` (`views/exercise`: personal best, record count, measure
   chips, the recharts line chart from `@maat-apps/ui/chart` with records

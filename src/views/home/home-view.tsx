@@ -9,6 +9,7 @@ import { useAppSettings } from "../../hooks/use-app-settings";
 import { useGymData, useGymReady } from "../../hooks/use-gym-data";
 import { useTranslation } from "../../i18n/use-translation";
 import { setSelectedPlan } from "../../lib/app-settings";
+import { planTabs } from "../../lib/plans";
 import { sync, syncOnStart } from "../../lib/storage";
 import { SettingsDrawer } from "../settings/settings-drawer";
 import { SyncError } from "../settings/sync-error";
@@ -18,7 +19,8 @@ import { PlanTabs } from "./plan-tabs";
 
 /**
  * "/": one plan's exercises at a time — refresh and settings in the header,
- * the plans as tabs along the bottom (the owner's layout for this app).
+ * the plans (and "Other", for exercises in none) as tabs along the bottom
+ * (the owner's layout for this app).
  */
 export function HomeView() {
   const { t } = useTranslation();
@@ -32,7 +34,7 @@ export function HomeView() {
     void syncOnStart();
   }, []);
 
-  const plans = data?.plans ?? [];
+  const plans = data ? planTabs(data, t("otherPlan")) : [];
   const plan = plans.find((item) => item.id === selectedPlan) ?? plans[0];
   const exercises = (plan?.exercises ?? []).flatMap((id) => {
     const exercise = data?.exercises.find((item) => item.id === id);

@@ -39,6 +39,13 @@ test("connecting downloads the data and lists the first plan", async ({
     page.getByRole("list", { name: "Plan B" }).getByText("Hold"),
   ).toBeVisible();
 
+  // Exercises no plan lists are under "Other".
+  await page.getByRole("tab", { name: "Other" }).click();
+  await expect(
+    page.getByRole("list", { name: "Other" }).getByText("Row"),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "Plan B" }).click();
+
   // The data and the chosen plan survive a reload.
   await waitForStoredPlan(page, "b");
   await page.reload();
