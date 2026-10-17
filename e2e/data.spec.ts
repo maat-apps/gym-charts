@@ -6,6 +6,7 @@ import {
   goHome,
   installPrfAuthenticator,
   mockGitHub,
+  waitForStoredPlan,
 } from "./utils";
 
 test.use({ serviceWorkers: "block" });
@@ -35,6 +36,7 @@ test("connecting downloads the data and lists the first plan", async ({
   ).toBeVisible();
 
   // The data and the chosen plan survive a reload.
+  await waitForStoredPlan(page, "b");
   await page.reload();
   await expect(
     page.getByRole("list", { name: "Plan B" }).getByText("Hold"),

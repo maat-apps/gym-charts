@@ -131,3 +131,33 @@ export async function closeSettings(page: Page) {
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toBeHidden();
 }
+
+/**
+ * Resolves once the chosen plan has reached IndexedDB. Settings persist in
+ * the background, so a reload right after picking a plan can beat the
+ * write. Database and key names are duplicated by hand: this runs in the
+ * page, which can't import from src/.
+ */
+export async function waitForStoredPlan(page: Page, plan: string) {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise<unknown>((resolve) => {
+            const request = indexedDB.open("gym-charts");
+            request.onsuccess = () => {
+              const read = request.result
+                .transaction("kv")
+                .objectStore("kv")
+                .get("gym-charts-settings");
+              read.onsuccess = () =>
+                resolve(
+                  (read.result as { selectedPlan?: unknown } | undefined)
+                    ?.selectedPlan,
+                );
+            };
+          }),
+      ),
+    )
+    .toBe(plan);
+}
