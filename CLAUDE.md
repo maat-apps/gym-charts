@@ -69,8 +69,8 @@ scope are in [`PRODUCT.md`](./PRODUCT.md).
   is the best session by the same rule ("100 kg × 3, 3, 3, 2"),
   `groupSets` groups sets for display. Number/date formatting:
   `lib/format.ts`.
-- **Screens.** `/` (`views/home`: one plan at a time, plan chips + settings
-  in the bottom bar, the chosen plan remembered in `app-settings.ts`'s
+- **Screens.** `/` (`views/home`: one plan at a time; settings, plan chips
+  and Refresh in `@maat-apps/ui`'s `BottomBar`, the chosen plan remembered in `app-settings.ts`'s
   `selectedPlan`; rows show the personal best and a sparkline),
   `/exercise/:id` (`views/exercise`: personal best, record count, measure
   chips, the recharts line chart from `@maat-apps/ui/chart` with records
