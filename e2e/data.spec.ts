@@ -1,8 +1,19 @@
 import { expect, test } from "@playwright/test";
 
-import { closeSettings, connect, goHome, mockGitHub } from "./utils";
+import {
+  closeSettings,
+  connect,
+  goHome,
+  installPrfAuthenticator,
+  mockGitHub,
+  waitForStoredPlan,
+} from "./utils";
 
 test.use({ serviceWorkers: "block" });
+
+test.beforeEach(async ({ page }) => {
+  await installPrfAuthenticator(page);
+});
 
 test("connecting downloads the data and lists the first plan", async ({
   page,
@@ -25,6 +36,7 @@ test("connecting downloads the data and lists the first plan", async ({
   ).toBeVisible();
 
   // The data and the chosen plan survive a reload.
+  await waitForStoredPlan(page, "b");
   await page.reload();
   await expect(
     page.getByRole("list", { name: "Plan B" }).getByText("Hold"),

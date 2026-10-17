@@ -72,13 +72,6 @@ describe("appLock", () => {
 describe("appLock data", () => {
   it("erases the source and data on disableAndErase", async () => {
     const { settings, appLock } = await freshModules();
-    const storage = await import("@/lib/storage");
-    await storage.whenLoaded();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({ version: 1 }))),
-    );
-    await storage.connect({ repo: "a/b", path: "f.json", token: "t" });
     settings.setLockEnrolment({
       credentialId: "c1",
       userId: "u1",
@@ -86,6 +79,28 @@ describe("appLock data", () => {
       encryptionSupported: true,
       prfSalt: "c2FsdA",
     });
+    const { deriveKey, randomBytes } = await import("@maat-apps/core/crypto");
+    const { encryptionKey } = await import("@/lib/encryption-key");
+    encryptionKey.set(
+      await deriveKey(randomBytes(32), randomBytes(16), "test-data-v1"),
+    );
+    const storage = await import("@/lib/storage");
+    await storage.whenLoaded();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              sha: "s1",
+              encoding: "base64",
+              content: btoa(JSON.stringify({ version: 1 })),
+            }),
+          ),
+      ),
+    );
+    await storage.connect({ repo: "a/b", path: "f.json", token: "t" });
+    expect(storage.getGymSnapshot().source).not.toBeNull();
 
     await appLock.disableAndErase();
 

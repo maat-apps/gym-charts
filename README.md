@@ -15,5 +15,7 @@ for the conventions shared by every maat app.
 2. Create a fine-grained personal access token: GitHub → Settings →
    Developer settings → Fine-grained tokens, repository access _only that
    repo_, permission **Contents: Read-only**.
-3. In the app: Settings → Data → repository `owner/repo`, file, token →
-   Connect.
+3. In the app: turn on Settings → Security → App lock (the token is only
+   ever stored encrypted, so this needs a fingerprint unlock with
+   encryption), then Settings → Data → repository `owner/repo`, file,
+   token → Connect.

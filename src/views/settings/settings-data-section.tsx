@@ -1,5 +1,6 @@
 import { useId, useState, type FormEvent } from "react";
 
+import { GitHubError, type GitHubErrorKind } from "@maat-apps/core/github";
 import { Button } from "@maat-apps/ui/button";
 import { ConfirmDrawer } from "@maat-apps/ui/confirm-drawer";
 import { Input } from "@maat-apps/ui/input";
@@ -7,11 +8,17 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@maat-apps/ui/settings-primitives";
+import { useAppSettings } from "../../hooks/use-app-settings";
 import { useGymData } from "../../hooks/use-gym-data";
 import { useTranslation } from "../../i18n/use-translation";
 import { formatDateTime } from "../../lib/format";
-import { DEFAULT_DATA_PATH, isValidRepo } from "../../lib/github";
-import { connect, disconnect, sync } from "../../lib/storage";
+import {
+  connect,
+  DEFAULT_DATA_PATH,
+  disconnect,
+  isValidRepo,
+  sync,
+} from "../../lib/storage";
 
 import { SyncError } from "./sync-error";
 
@@ -64,6 +71,8 @@ function ConnectForm() {
   const [path, setPath] = useState(DEFAULT_DATA_PATH);
   const [token, setToken] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState<GitHubErrorKind | null>(null);
   const repoError = submitted && !isValidRepo(repo.trim());
   const tokenError = submitted && token.trim() === "";
 
@@ -71,11 +80,17 @@ function ConnectForm() {
     event.preventDefault();
     setSubmitted(true);
     if (!isValidRepo(repo.trim()) || token.trim() === "") return;
-    void connect({
+    setError(null);
+    setConnecting(true);
+    connect({
       repo: repo.trim(),
       path: path.trim() || DEFAULT_DATA_PATH,
       token: token.trim(),
-    });
+    })
+      .catch((reason: unknown) =>
+        setError(reason instanceof GitHubError ? reason.kind : "server"),
+      )
+      .finally(() => setConnecting(false));
   }
 
   return (
@@ -101,7 +116,10 @@ function ConnectForm() {
         onChange={setToken}
       />
       <p className="text-muted-foreground m-0 text-xs">{t("tokenHelp")}</p>
-      <Button type="submit">{t("connectAction")}</Button>
+      {error && <SyncError error={error} />}
+      <Button type="submit" disabled={connecting}>
+        {t("connectAction")}
+      </Button>
     </form>
   );
 }
@@ -109,6 +127,7 @@ function ConnectForm() {
 export function DataSection() {
   const { t, locale } = useTranslation();
   const { source, syncedAt, syncing, error } = useGymData();
+  const { lock } = useAppSettings();
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   return (
@@ -160,8 +179,12 @@ export function DataSection() {
             }}
           />
         </>
-      ) : (
+      ) : lock?.encryptionSupported ? (
         <ConnectForm />
+      ) : (
+        <p className="text-muted-foreground m-0 px-1 text-sm">
+          {t("connectNeedsEncryption")}
+        </p>
       )}
     </SettingsSection>
   );

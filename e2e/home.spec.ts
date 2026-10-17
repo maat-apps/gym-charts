@@ -22,3 +22,13 @@ test("renders in Outfit", async ({ page }) => {
   );
   expect(loadedFaces).toBeGreaterThan(0);
 });
+
+test("connecting a repo needs the lock that encrypts", async ({ page }) => {
+  await goHome(page);
+  await page.getByRole("button", { name: "Settings" }).first().click();
+
+  await expect(
+    page.getByText(/Connecting a repo needs the app lock with encryption/),
+  ).toBeVisible();
+  await expect(page.getByLabel("Token")).toHaveCount(0);
+});

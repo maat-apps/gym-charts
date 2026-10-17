@@ -21,6 +21,10 @@ export default defineConfig({
     {
       name: "mobile-iphone",
       use: { ...devices["iPhone 13"] },
+      // Connecting needs a lock that encrypts (WebAuthn PRF); the only
+      // virtual authenticator with PRF is Chromium's (e2e/utils.ts's
+      // installPrfAuthenticator), so these specs run on mobile-chromium.
+      testIgnore: ["**/data.spec.ts"],
     },
   ],
 });

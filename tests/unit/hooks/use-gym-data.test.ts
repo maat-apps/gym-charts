@@ -6,6 +6,21 @@ import { resetIndexedDb } from "../reset-indexeddb";
 
 async function freshModules() {
   vi.resetModules();
+  // Connecting needs a lock that encrypts, and its key.
+  const settings = await import("@/lib/app-settings");
+  await settings.whenLoaded();
+  settings.setLockEnrolment({
+    credentialId: "c1",
+    userId: "u1",
+    createdAt: "now",
+    encryptionSupported: true,
+    prfSalt: "c2FsdA",
+  });
+  const { deriveKey, randomBytes } = await import("@maat-apps/core/crypto");
+  const { encryptionKey } = await import("@/lib/encryption-key");
+  encryptionKey.set(
+    await deriveKey(randomBytes(32), randomBytes(16), "test-data-v1"),
+  );
   const hooks = await import("@/hooks/use-gym-data");
   const storage = await import("@/lib/storage");
   await storage.whenLoaded();
@@ -24,7 +39,16 @@ describe("useGymData / useExercise / useGymReady", () => {
   it("follows the store", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(rawData))),
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              sha: "s1",
+              encoding: "base64",
+              content: btoa(JSON.stringify(rawData)),
+            }),
+          ),
+      ),
     );
     const { useGymData, useExercise, useGymReady, storage } =
       await freshModules();
