@@ -1,6 +1,6 @@
 {
-  "name": "Gym charts",
-  "short_name": "Gym charts",
+  "name": "Gym Charts",
+  "short_name": "Gym Charts",
   "description": "Your training progress over time, records marked.",
   "start_url": "/gym-charts/",
   "scope": "/gym-charts/",

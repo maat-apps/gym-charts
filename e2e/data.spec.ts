@@ -30,7 +30,11 @@ test("connecting downloads the data and lists the first plan", async ({
   await expect(plan.getByText("Best 57.5 kg × 3 · Sessions: 4")).toBeVisible();
   await expect(plan.getByText("inactive")).toBeVisible();
 
-  await page.getByRole("button", { name: "Plan B" }).click();
+  await page.getByRole("tab", { name: "Plan B" }).click();
+  await expect(page.getByRole("tab", { name: "Plan B" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   await expect(
     page.getByRole("list", { name: "Plan B" }).getByText("Hold"),
   ).toBeVisible();

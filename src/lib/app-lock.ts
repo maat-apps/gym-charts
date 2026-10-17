@@ -13,7 +13,7 @@ export const HKDF_INFO = "gym-charts-data-v1";
 // stored data and token when the authenticator supports PRF, a UI gate
 // otherwise.
 export const appLock = createAppLock({
-  name: "Gym charts",
+  name: "Gym Charts",
   keyInfo: HKDF_INFO,
   keyHolder: encryptionKey,
   saveEnrolment: setLockEnrolment,
