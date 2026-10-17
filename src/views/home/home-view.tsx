@@ -2,9 +2,14 @@ import { ArrowsClockwise, Gear } from "@phosphor-icons/react";
 import { startTransition, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
-import { Button } from "@maat-apps/ui/button";
+import {
+  BottomBar,
+  BottomBarButton,
+  BottomBarChip,
+  BottomBarChips,
+} from "@maat-apps/ui/bottom-bar";
 import { EmptyState } from "@maat-apps/ui/empty-state";
-import { PageHeader, PageTitle } from "@maat-apps/ui/page-header";
+import { PageTitle } from "@maat-apps/ui/page-header";
 import { useAppSettings } from "../../hooks/use-app-settings";
 import { useGymData, useGymReady } from "../../hooks/use-gym-data";
 import { useTranslation } from "../../i18n/use-translation";
@@ -39,36 +44,9 @@ export function HomeView() {
     startTransition(() => navigate(`/exercise/${encodeURIComponent(id)}`));
   }
 
-  const settingsButton = (
-    <Button
-      variant="ghost"
-      size="icon-lg"
-      className="size-14 shrink-0"
-      aria-label={t("settings")}
-      onClick={() => setSettingsOpen(true)}
-    >
-      <Gear className="size-6" />
-    </Button>
-  );
-
   return (
-    <div className="mx-auto flex min-h-dvh w-[min(100%,480px)] flex-col gap-5 px-5 pt-27 pb-[calc(112px+env(safe-area-inset-bottom))]">
-      <PageHeader>
-        <PageTitle>{t("appName")}</PageTitle>
-        {source && (
-          <Button
-            variant="ghost"
-            size="icon-lg"
-            aria-label={t("refresh")}
-            disabled={syncing}
-            onClick={() => void sync()}
-          >
-            <ArrowsClockwise
-              className={syncing ? "size-6 animate-spin" : "size-6"}
-            />
-          </Button>
-        )}
-      </PageHeader>
+    <div className="mx-auto flex min-h-dvh w-[min(100%,480px)] flex-col gap-5 px-5 pt-10">
+      <PageTitle>{t("appName")}</PageTitle>
       {error && data && <SyncError error={error} />}
       {!ready ? null : !source ? (
         <EmptyState
@@ -108,28 +86,43 @@ export function HomeView() {
         </ul>
       )}
       {!data && error && <SyncError error={error} />}
-      <div className="bg-background/95 fixed inset-x-0 bottom-0 z-20 border-t backdrop-blur">
-        <div className="mx-auto flex w-[min(100%,480px)] items-center gap-1 px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
-          <div
-            role="group"
-            aria-label={t("plans")}
-            className="-ml-4 flex min-w-0 flex-1 [scrollbar-width:none] gap-2 overflow-x-auto [mask-image:linear-gradient(to_right,black_calc(100%-24px),transparent)] pr-6 pl-4"
+      <BottomBar
+        settings={
+          <BottomBarButton
+            label={t("settings")}
+            onClick={() => setSettingsOpen(true)}
           >
+            <Gear />
+          </BottomBarButton>
+        }
+        action={
+          source && (
+            <BottomBarButton
+              label={t("refresh")}
+              disabled={syncing}
+              onClick={() => void sync()}
+            >
+              <ArrowsClockwise
+                className={syncing ? "size-6 animate-spin" : "size-6"}
+              />
+            </BottomBarButton>
+          )
+        }
+      >
+        {plans.length > 0 && (
+          <BottomBarChips label={t("plans")}>
             {plans.map((item) => (
-              <Button
+              <BottomBarChip
                 key={item.id}
-                variant={item.id === plan?.id ? "default" : "outline"}
-                className="h-14 shrink-0 rounded-2xl px-4 text-base"
-                aria-pressed={item.id === plan?.id}
+                pressed={item.id === plan?.id}
                 onClick={() => setSelectedPlan(item.id)}
               >
                 {item.name}
-              </Button>
+              </BottomBarChip>
             ))}
-          </div>
-          {settingsButton}
-        </div>
-      </div>
+          </BottomBarChips>
+        )}
+      </BottomBar>
       <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
