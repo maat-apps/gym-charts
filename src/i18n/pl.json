@@ -1,5 +1,5 @@
 {
-  "appName": "Gym charts",
+  "appName": "Gym Charts",
   "desktopNotSupported": "Ta aplikacja jest przeznaczona na urządzenia mobilne.",
   "settings": "Ustawienia",
   "back": "Wstecz",
@@ -7,6 +7,7 @@
   "refresh": "Odśwież",
   "downloading": "Pobieranie…",
   "plans": "Plany",
+  "otherPlan": "Inne",
   "connectTitle": "Połącz swoje dane",
   "connectDescription": "Twoje dane treningowe są w Twoim prywatnym repozytorium na GitHubie. Połącz je w Ustawieniach.",
   "connectAction": "Połącz",

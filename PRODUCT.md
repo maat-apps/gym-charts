@@ -2,7 +2,7 @@
 
 ## Product
 
-Gym charts is a private, phone-first PWA that shows how your training
+Gym Charts is a private, phone-first PWA that shows how your training
 progresses: one chart per exercise over your sessions, with records
 marked. It only reads — the training log itself is a JSON file in your
 own private GitHub repo, downloaded with a read-only token that never
@@ -16,8 +16,8 @@ web - PWA, mobile-only (like routines, notes and albums).
 
 ## Scope
 
-- Plans as tabs (e.g. Plan A, Plan B, an "other" bucket for old
-  exercises); an exercise can be marked inactive.
+- Plans as tabs (e.g. Plan A, Plan B), plus "Other" for the exercises
+  no plan lists (e.g. old ones); an exercise can be marked inactive.
 - Per exercise: personal best, number of records, a line chart per
   measure (weight, estimated 1RM, volume; assistance for assisted
   exercises, with the axis flipped; reps; hold time, per side when

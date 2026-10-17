@@ -1,4 +1,4 @@
-# Gym charts
+# Gym Charts
 
 Your training progress over time, records marked — a maat-apps PWA that
 reads your workout log from your own private GitHub repo. See
