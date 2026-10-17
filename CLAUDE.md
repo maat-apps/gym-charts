@@ -46,14 +46,22 @@ scope are in [`PRODUCT.md`](./PRODUCT.md).
   directly, not Playwright's own `test.extend()` fixture-injection system.
 - **Data.** The app doesn't edit training data: it reads one JSON file
   (`schemas.ts`, `version: 1`, documented in the private data repo's
-  README) from the user's own private GitHub repo — `lib/github.ts`, the
-  contents API with a fine-grained read-only token pasted in Settings →
-  Data. `src/lib/storage.ts` keeps the source (repo, path, token), the
-  last downloaded copy and its time in memory + IndexedDB (maat-core's
-  `docs/storage.md`), encrypted with the lock's key; read through
-  `src/hooks/use-gym-data.ts`. It downloads once per app run
+  README) from the user's own private GitHub repo — maat-core's GitHub
+  pattern in read-only mode (`docs/storage-github.md`,
+  `@maat-apps/core/github`'s `createRepoMirror`), with a fine-grained
+  read-only token pasted in Settings → Data. `src/lib/storage.ts` keeps
+  the last downloaded copy and its time in a `/local` store (`DATA_KEY`,
+  encrypted with the lock's key) and the connection (repo, path, token)
+  under `GITHUB_KEY`, **only ever stored encrypted** — no connection
+  without a lock that encrypts; the lock's rewrite re-encrypts or deletes
+  it. An old source kept with the data (before core's pattern) moves to the
+  connection on load, or is dropped without an encrypting lock. Read
+  through `src/hooks/use-gym-data.ts`. It downloads once per app run
   (`syncOnStart`, from home) and on Refresh; a failed download keeps the
-  old copy and shows why (`views/settings/sync-error.tsx`). No backups or
+  old copy and shows why (`views/settings/sync-error.tsx`, core's
+  `GitHubError` kinds). E2E connects through a Chromium-only virtual
+  authenticator with PRF (`e2e/utils.ts`'s `installPrfAuthenticator`), so
+  `data.spec.ts` runs on mobile-chromium only. No backups or
   update snapshot — the repo is the backup. **Never commit the owner's
   numbers** — tests and e2e use made-up data (`tests/unit/fixtures/`,
   `e2e/utils.ts`'s `GYM_DATA`, GitHub mocked with `page.route`).

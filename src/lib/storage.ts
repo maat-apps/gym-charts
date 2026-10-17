@@ -1,8 +1,12 @@
 import {
-  decryptJson,
-  encryptJson,
-  isEncryptedBlob,
-} from "@maat-apps/core/crypto";
+  createRepoConnection,
+  createRepoMirror,
+  parseRepo,
+  type GitHubErrorKind,
+  type MirrorCopy,
+  type RepoLocation,
+} from "@maat-apps/core/github";
+import { createLocalStore } from "@maat-apps/core/local";
 import { isRecord } from "@maat-apps/core/validation";
 
 import {
@@ -10,21 +14,26 @@ import {
   whenLoaded as whenSettingsLoaded,
 } from "./app-settings";
 import { encryptionKey } from "./encryption-key";
-import {
-  fetchGymData,
-  isValidRepo,
-  type DataSource,
-  type FetchError,
-} from "./github";
-import { kvGet, kvSet } from "./idb-store";
+import { keyValueStore } from "./idb-store";
 import { DATA_VERSION, parseGymData, type GymData } from "./schemas";
-import { DATA_KEY } from "./storage-keys";
+import { DATA_KEY, GITHUB_KEY } from "./storage-keys";
 
-// The data source (repo, path, token), the last downloaded copy of the data
-// and when it was fetched — in memory once loaded, written through to
-// IndexedDB (maat-core's docs/storage.md), encrypted with the lock's key.
-// The token lives here rather than in app-settings so it is encrypted too.
-// Screens subscribe through src/hooks/use-gym-data.ts.
+// The data file in the user's private GitHub repo, read-only
+// (@maat-apps/core/github's mirror, maat-core's docs/storage-github.md):
+// the last downloaded copy and when it came live in a /local store under
+// DATA_KEY, encrypted with the lock's key; the connection (repo, path,
+// token) is only ever stored encrypted, under GITHUB_KEY — no connection
+// without a lock that encrypts. Screens subscribe through
+// src/hooks/use-gym-data.ts.
+
+/** Where the data comes from, as Settings asks for it. */
+export type DataSource = {
+  /** "owner/repo" */
+  repo: string;
+  /** Path of the JSON file inside the repo. */
+  path: string;
+  token: string;
+};
 
 export type GymState = {
   source: DataSource | null;
@@ -33,35 +42,27 @@ export type GymState = {
   syncedAt: string | null;
   syncing: boolean;
   /** Why the last download failed; cleared by the next success. */
-  error: FetchError | null;
+  error: GitHubErrorKind | null;
 };
 
-const EMPTY: GymState = {
-  source: null,
-  data: null,
-  syncedAt: null,
-  syncing: false,
-  error: null,
-};
+export const DEFAULT_DATA_PATH = "gym-data.json";
 
-const listeners = new Set<() => void>();
-let state: GymState = EMPTY;
-let loaded: Promise<void> | null = null;
-let ready = false;
-let syncedThisRun = false;
-
-function emitChange(): void {
-  for (const listener of listeners) {
-    listener();
-  }
+export function isValidRepo(repo: string): boolean {
+  return parseRepo(repo) !== null;
 }
 
-function update(changes: Partial<GymState>): void {
-  state = { ...state, ...changes };
-  emitChange();
+/** Whether the enrolled lock encrypts — then the first read waits for its key. */
+async function lockEncrypts(): Promise<boolean> {
+  await whenSettingsLoaded();
+  return getSettingsSnapshot().lock?.encryptionSupported === true;
 }
 
-function parseSource(value: unknown): DataSource | null {
+// Before core's GitHub pattern, the source (token included) was kept with
+// the data — encrypted only when the lock encrypted. Read once, it moves to
+// the encrypted connection, or is dropped when there's no key to keep it.
+let legacySource: DataSource | null = null;
+
+function parseLegacySource(value: unknown): DataSource | null {
   if (!isRecord(value)) return null;
   const { repo, path, token } = value;
   return typeof repo === "string" &&
@@ -72,125 +73,166 @@ function parseSource(value: unknown): DataSource | null {
     : null;
 }
 
-function parseStored(value: unknown): Partial<GymState> {
-  if (!isRecord(value)) return {};
-  return {
-    source: parseSource(value.source),
-    data: parseGymData(value.data),
-    syncedAt: typeof value.syncedAt === "string" ? value.syncedAt : null,
-  };
+type StoredCopy = {
+  data: (GymData & { version: number }) | null;
+  syncedAt: string | null;
+};
+
+const copyStore = createLocalStore<MirrorCopy<GymData>, StoredCopy>({
+  storage: keyValueStore,
+  key: DATA_KEY,
+  empty: { data: null, syncedAt: null },
+  parse: (stored) => {
+    if (!isRecord(stored)) return { data: null, syncedAt: null };
+    legacySource = parseLegacySource(stored.source);
+    return {
+      data: parseGymData(stored.data),
+      syncedAt: typeof stored.syncedAt === "string" ? stored.syncedAt : null,
+    };
+  },
+  serialize: ({ data, syncedAt }) => ({
+    data: data && { version: DATA_VERSION, ...data },
+    syncedAt,
+  }),
+  encryption: { keyHolder: encryptionKey, encrypts: lockEncrypts },
+});
+
+const connection = createRepoConnection({
+  storage: keyValueStore,
+  key: GITHUB_KEY,
+  keyHolder: encryptionKey,
+  encrypts: lockEncrypts,
+  extra: { initial: {}, parse: () => ({}) },
+});
+
+function toLocation({ repo, path, token }: DataSource): RepoLocation {
+  const parsed = parseRepo(repo) ?? { owner: "", repo: "" };
+  // No branch: the repository's default one.
+  return { ...parsed, branch: "", path: path.trim(), token };
 }
 
-async function load(): Promise<void> {
-  await whenSettingsLoaded();
-  if (getSettingsSnapshot().lock?.encryptionSupported) {
-    // The app sits behind the lock screen until unlock succeeds, so the
-    // data is never needed — and never readable — before the key is.
-    await encryptionKey.whenSet();
+const mirror = createRepoMirror({
+  connection,
+  store: copyStore,
+  parseFile: (text) => {
+    const data = parseGymData(JSON.parse(text));
+    if (!data) throw new Error("Not a gym data file.");
+    return data;
+  },
+});
+
+async function migrateLegacySource(): Promise<void> {
+  await Promise.all([copyStore.whenLoaded(), connection.whenLoaded()]);
+  const source = legacySource;
+  if (!source) return;
+  legacySource = null;
+  if (connection.canConnect() && !connection.get()) {
+    await connection.save(toLocation(source));
   }
-  try {
-    const stored = await kvGet<unknown>(DATA_KEY);
-    const key = encryptionKey.get();
-    const value =
-      key && isEncryptedBlob(stored)
-        ? await decryptJson<unknown>(key, stored)
-        : stored;
-    state = { ...state, ...parseStored(value) };
-  } catch {
-    // Keep what's in memory — same fallback as a corrupt or missing value.
-  } finally {
-    ready = true;
-    emitChange();
-  }
+  // Writes the copy again without the source (and its token).
+  await copyStore.rewrite();
 }
 
-/** Starts the background read on first use; test-only to await directly. */
+let loaded: Promise<void> | null = null;
+
+/** Starts the background reads on first use; test-only to await directly. */
 export function whenLoaded(): Promise<void> {
-  loaded ??= load();
+  loaded ??= migrateLegacySource();
   return loaded;
 }
 
-export function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
+const EMPTY: GymState = {
+  source: null,
+  data: null,
+  syncedAt: null,
+  syncing: false,
+  error: null,
+};
 
+let snapshot = EMPTY;
+let snapshotParts: unknown[] = [];
+
+/** The copy, the connection and the download status, as one stable value. */
 export function getGymSnapshot(): GymState {
   void whenLoaded();
-  return state;
+  const copy = copyStore.getSnapshot();
+  const location = connection.get();
+  const status = mirror.getStatus();
+  const parts = [copy, location, status];
+  if (parts.some((part, index) => part !== snapshotParts[index])) {
+    snapshotParts = parts;
+    snapshot = {
+      source: location && {
+        repo: `${location.owner}/${location.repo}`,
+        path: location.path,
+        token: location.token,
+      },
+      data: copy.data,
+      syncedAt: copy.syncedAt,
+      syncing: status.syncing,
+      error: status.error,
+    };
+  }
+  return snapshot;
 }
 
 export function getServerGymSnapshot(): GymState {
   return EMPTY;
 }
 
-/** Whether the initial read has finished — until then "no data" can't be
- * told apart from "not loaded yet". */
+export function subscribe(listener: () => void): () => void {
+  const unsubscribers = [
+    copyStore.subscribe(listener),
+    connection.subscribe(listener),
+    mirror.subscribeStatus(listener),
+  ];
+  return () => {
+    for (const unsubscribe of unsubscribers) unsubscribe();
+  };
+}
+
+/** Whether the stored copy and connection have been read — until then "no
+ * data" can't be told apart from "not loaded yet". */
 export function isGymReady(): boolean {
   void whenLoaded();
-  return ready;
+  return copyStore.isReady() && connection.isReady();
 }
 
 export function isGymReadyOnServer(): boolean {
   return false;
 }
 
-/** Writes what's in memory now (also the lock's re-encrypting rewrite). */
-export async function persist(): Promise<void> {
-  const { source, data, syncedAt } = state;
-  const value = {
-    source,
-    data: data && { version: DATA_VERSION, ...data },
-    syncedAt,
-  };
-  try {
-    const key = encryptionKey.get();
-    await kvSet(DATA_KEY, key ? await encryptJson(key, value) : value);
-  } catch {
-    // Best-effort — the in-memory copy (and this tab) already reflects it.
-  }
-}
+/** Whether a token may be stored: the lock is on, encrypts, and is unlocked. */
+export const canConnect = connection.canConnect;
 
-/** Downloads the data file from the configured source. */
-export async function sync(now = () => new Date()): Promise<void> {
+/** Downloads the data file from the connected repo. */
+export async function sync(): Promise<void> {
   await whenLoaded();
-  const { source } = state;
-  if (!source || state.syncing) return;
-  update({ syncing: true });
-  const result = await fetchGymData(source);
-  if (result.ok) {
-    update({
-      data: result.data,
-      syncedAt: now().toISOString(),
-      syncing: false,
-      error: null,
-    });
-    await persist();
-  } else {
-    update({ syncing: false, error: result.error });
-  }
+  await mirror.sync();
 }
 
 /** The first call per app run syncs; later ones don't. */
-export function syncOnStart(): Promise<void> {
-  if (syncedThisRun) return Promise.resolve();
-  syncedThisRun = true;
-  return sync();
+export async function syncOnStart(): Promise<void> {
+  await whenLoaded();
+  await mirror.syncOnStart();
 }
 
-/** Saves a new source and downloads from it straight away. */
+/**
+ * Checks the token can read the repo, stores the connection (encrypted) and
+ * downloads from it straight away. Throws core's `GitHubError` for a token
+ * or repo GitHub refuses, `RepoConnectionError` without an encrypting lock.
+ */
 export async function connect(source: DataSource): Promise<void> {
   await whenLoaded();
-  update({ source, error: null });
-  await persist();
-  await sync();
+  await connection.connect(toLocation(source));
+  await mirror.sync();
 }
 
-/** Forgets the token and every downloaded copy (also the lock's erase). */
+/** Forgets the token and every downloaded copy. */
 export async function disconnect(): Promise<void> {
   await whenLoaded();
-  update({ source: null, data: null, syncedAt: null, error: null });
-  await persist();
+  await Promise.all([connection.disconnect(), copyStore.erase()]);
 }
+
+/** For the app lock (`lockData`): the copy and the connection. */
+export const lockParts = [copyStore, connection] as const;

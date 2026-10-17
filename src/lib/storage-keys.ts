@@ -3,3 +3,5 @@
 export const SETTINGS_KEY = "gym-charts-settings";
 export const LOCALE_KEY = "gym-charts-locale";
 export const DATA_KEY = "gym-charts-data";
+/** The repo connection (token included), only ever stored encrypted. */
+export const GITHUB_KEY = "gym-charts-github";

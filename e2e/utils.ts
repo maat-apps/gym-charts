@@ -74,14 +74,53 @@ export async function mockGitHub(
     route.fulfill({
       status,
       contentType: "application/json",
-      body: JSON.stringify(body),
+      // The contents API's own shape: the file base64-encoded.
+      body: JSON.stringify(
+        status === 200
+          ? {
+              sha: "s1",
+              encoding: "base64",
+              content: Buffer.from(JSON.stringify(body)).toString("base64"),
+            }
+          : body,
+      ),
     }),
   );
 }
 
-/** Opens Settings and connects to the mocked repo. */
+/**
+ * A virtual authenticator with the PRF extension, over Chromium's DevTools
+ * protocol — Playwright's own (`credentials.install()`) has no PRF, and the
+ * repo connection needs a lock that encrypts. Chromium only, so the specs
+ * that connect run on mobile-chromium alone (playwright.config.ts).
+ */
+export async function installPrfAuthenticator(page: Page) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: {
+      protocol: "ctap2",
+      ctap2Version: "ctap2_1",
+      transport: "internal",
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      hasPrf: true,
+      automaticPresenceSimulation: true,
+    },
+  });
+}
+
+/**
+ * Opens Settings, turns on the lock (encrypting, through the PRF
+ * authenticator `installPrfAuthenticator` set up) and connects to the
+ * mocked repo.
+ */
 export async function connect(page: Page) {
   await page.getByRole("button", { name: "Settings" }).first().click();
+  const lock = page.getByRole("switch", { name: "App lock" });
+  await lock.click();
+  await expect(lock).toBeChecked();
   await page.getByLabel("Repository").fill("someone/gym");
   await page.getByLabel("Token").fill("github_pat_test");
   await page.getByRole("button", { name: "Connect" }).click();
