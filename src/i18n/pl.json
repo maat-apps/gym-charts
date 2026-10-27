@@ -86,5 +86,12 @@
   "eraseDataWarningTitle": "To usunie Twoje dane",
   "eraseDataWarningDescription": "Twoje dane są zaszyfrowane i można je odczytać tylko działającym odblokowaniem odciskiem palca. Skoro nie jest teraz dostępne, wyłączenie blokady usunie je z tego urządzenia — repozytorium ma swoją kopię, więc możesz połączyć się ponownie.",
   "eraseDataConfirm": "Usuń i kontynuuj",
-  "eraseDataCancel": "Anuluj"
+  "eraseDataCancel": "Anuluj",
+  "relockAfter": "Zablokuj ponownie",
+  "relockAfterDescription": "Po wyjściu z aplikacji.",
+  "relockNow": "Od razu",
+  "relock30s": "Po 30 s",
+  "relockClose": "Po zamknięciu",
+  "updateConfirmTitle": "Zaktualizować teraz?",
+  "updateConfirmDescription": "Aplikacja przeładuje się z najnowszą wersją. Połączenie i dane zostaną."
 }

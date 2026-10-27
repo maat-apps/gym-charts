@@ -86,7 +86,10 @@ scope are in [`PRODUCT.md`](./PRODUCT.md).
   `/exercise/:id` (`views/exercise`: personal best, record count, measure
   chips, the recharts line chart from `@maat-apps/ui/chart` with records
   as ringed dots, sessions newest first). Settings is a drawer
-  (`views/settings/`, one `settings-<name>-section.tsx` per card).
+  (`@maat-apps/ui/settings-sections`' `SettingsDrawer`):
+  `views/settings/settings-panel.tsx` puts gym-charts' data section (the
+  repo connection) before ui's Language, Security (with "lock again";
+  `app-settings.ts` is core's `createAppSettings`) and App sections.
 - **i18n.** `src/i18n/en.json` and `pl.json` (core's `createTranslation`;
   device language on first launch, Settings → Language after). `t()`
   only accepts keys present in both — keep them in sync. Exercise and

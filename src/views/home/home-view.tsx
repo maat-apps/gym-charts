@@ -5,13 +5,14 @@ import { useNavigate } from "react-router";
 import { Button } from "@maat-apps/ui/button";
 import { EmptyState } from "@maat-apps/ui/empty-state";
 import { PageHeader, PageTitle } from "@maat-apps/ui/page-header";
+import { SettingsDrawer } from "@maat-apps/ui/settings-sections";
 import { useAppSettings } from "../../hooks/use-app-settings";
 import { useGymData, useGymReady } from "../../hooks/use-gym-data";
 import { useTranslation } from "../../i18n/use-translation";
 import { setSelectedPlan } from "../../lib/app-settings";
 import { planTabs } from "../../lib/plans";
 import { sync, syncOnStart } from "../../lib/storage";
-import { SettingsDrawer } from "../settings/settings-drawer";
+import { SettingsPanel } from "../settings/settings-panel";
 import { SyncError } from "../settings/sync-error";
 
 import { ExerciseRow } from "./exercise-row";
@@ -122,7 +123,13 @@ export function HomeView() {
           onSelect={setSelectedPlan}
         />
       )}
-      <SettingsDrawer open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDrawer
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        title={t("settings")}
+      >
+        <SettingsPanel />
+      </SettingsDrawer>
     </div>
   );
 }

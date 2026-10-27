@@ -1,7 +1,7 @@
 import { lockData } from "@maat-apps/core/local";
 import { createAppLock } from "@maat-apps/core/lock";
 
-import { setLockEnrolment } from "./app-settings";
+import { relockAfterMs, setLockEnrolment } from "./app-settings";
 import { encryptionKey } from "./encryption-key";
 import { lockParts } from "./storage";
 
@@ -16,6 +16,7 @@ export const appLock = createAppLock({
   name: "Gym Charts",
   keyInfo: HKDF_INFO,
   keyHolder: encryptionKey,
+  relockAfterMs,
   saveEnrolment: setLockEnrolment,
   // The downloaded copy is rewritten under the new key; the token is only
   // kept encrypted — re-encrypted, or deleted once the lock stops encrypting.

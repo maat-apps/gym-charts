@@ -86,5 +86,12 @@
   "eraseDataWarningTitle": "This will erase your data",
   "eraseDataWarningDescription": "Your data is encrypted and can only be read with a working fingerprint unlock. Since that isn't available right now, turning off the lock erases it from this device — your repo keeps its copy, so you can connect again.",
   "eraseDataConfirm": "Erase and continue",
-  "eraseDataCancel": "Cancel"
+  "eraseDataCancel": "Cancel",
+  "relockAfter": "Lock again",
+  "relockAfterDescription": "After leaving the app.",
+  "relockNow": "Right away",
+  "relock30s": "After 30 s",
+  "relockClose": "When closed",
+  "updateConfirmTitle": "Update now?",
+  "updateConfirmDescription": "The app reloads with its newest version. Your connection and data stay."
 }
