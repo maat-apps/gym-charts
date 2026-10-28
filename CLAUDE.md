@@ -61,7 +61,9 @@ scope are in [`PRODUCT.md`](./PRODUCT.md).
   old copy and shows why (`views/settings/sync-error.tsx`, core's
   `GitHubError` kinds). E2E connects through a Chromium-only virtual
   authenticator with PRF (`e2e/utils.ts`'s `installPrfAuthenticator`), so
-  `data.spec.ts` runs on mobile-chromium only. No backups or
+  `data.spec.ts` runs on mobile-chromium only (`installPrfAuthenticator`
+  and `readStored` come from `@maat-apps/config/playwright`, as do the
+  Vite, Vitest and unit-setup presets). No backups or
   update snapshot — the repo is the backup. **Never commit the owner's
   numbers** — tests and e2e use made-up data (`tests/unit/fixtures/`,
   `e2e/utils.ts`'s `GYM_DATA`, GitHub mocked with `page.route`).

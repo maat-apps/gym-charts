@@ -1,6 +1,10 @@
 // Reusable Playwright test helpers — plain functions specs call directly,
 // not test.extend() fixtures (hence "utils.ts", not "fixtures.ts" — see
 // maat-core/STRUCTURE.md's Testing section for why that naming matters).
+import {
+  installPrfAuthenticator,
+  readStored,
+} from "@maat-apps/config/playwright";
 import { expect, type Page } from "@playwright/test";
 
 export async function goHome(page: Page) {
@@ -94,28 +98,7 @@ export async function mockGitHub(
   );
 }
 
-/**
- * A virtual authenticator with the PRF extension, over Chromium's DevTools
- * protocol — Playwright's own (`credentials.install()`) has no PRF, and the
- * repo connection needs a lock that encrypts. Chromium only, so the specs
- * that connect run on mobile-chromium alone (playwright.config.ts).
- */
-export async function installPrfAuthenticator(page: Page) {
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send("WebAuthn.enable");
-  await cdp.send("WebAuthn.addVirtualAuthenticator", {
-    options: {
-      protocol: "ctap2",
-      ctap2Version: "ctap2_1",
-      transport: "internal",
-      hasResidentKey: true,
-      hasUserVerification: true,
-      isUserVerified: true,
-      hasPrf: true,
-      automaticPresenceSimulation: true,
-    },
-  });
-}
+export { installPrfAuthenticator };
 
 /**
  * Opens Settings, turns on the lock (encrypting, through the PRF
@@ -146,24 +129,13 @@ export async function closeSettings(page: Page) {
  */
 export async function waitForStoredPlan(page: Page, plan: string) {
   await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          new Promise<unknown>((resolve) => {
-            const request = indexedDB.open("gym-charts");
-            request.onsuccess = () => {
-              const read = request.result
-                .transaction("kv")
-                .objectStore("kv")
-                .get("gym-charts-settings");
-              read.onsuccess = () =>
-                resolve(
-                  (read.result as { selectedPlan?: unknown } | undefined)
-                    ?.selectedPlan,
-                );
-            };
-          }),
-      ),
-    )
+    .poll(async () => {
+      const settings = (await readStored(
+        page,
+        "gym-charts",
+        "gym-charts-settings",
+      )) as { selectedPlan?: unknown } | undefined;
+      return settings?.selectedPlan;
+    })
     .toBe(plan);
 }
